@@ -1,85 +1,3 @@
-Вот полный, готовый к использованию тулкит. Я спроектировал его так, чтобы он был максимально надёжным на слабых VPS, безопасным и требовал минимум ручных действий.
-
-Всё упаковано в единый скрипт `bootstrap.sh` (внутри него генерируются `rpp` CLI и `docker-compose.yml`), чтобы развёртывание действительно было **одной командой**.
-
-Для обхода блокировки DPI (Discord) выбран **Вариант А (Zapret)**, но реализован элегантно: мы не запускаем тяжелый интерактивный инсталлятор `zapret`, а скачиваем репозиторий, берем готовый бинарник `nfqws` под архитектуру сервера и создаем минималистичный systemd-сервис, который перехватывает трафик **только из подсети Docker**. Это работает железно, не ломает маршрутизацию хоста и не требует сторонних VPN/WARP.
-
-Скопируй структуру ниже и размести в своём публичном репозитории тулкита (например, `rpp-toolkit`).
-
----
-
-### Файловая структура вашего репозитория `rpp-toolkit`:
-
-1. `README.md`
-2. `bootstrap.sh`
-
----
-
-### 1. `README.md`
-
-```markdown
-# 🛠 RustPlusPlus (rpp) - Одноразовый VPS Toolkit
-
-Тулкит для автоматического развертывания бота [rustplusplus](https://github.com/alexemanuelol/rustplusplus) на дешёвых одноразовых VPS (от 512MB RAM) с автоматическим обходом блокировки Discord в РФ и бекапом состояния в приватный репозиторий.
-
-## 🚀 Фичи
-- **One-line deploy**: Одна команда на чистом Ubuntu/Debian сервере.
-- **Micro-VPS Ready**: Автоматический Swap (2GB), тюнинг V8/Node.js (`TS_NODE_TRANSPILE_ONLY`, `max-old-space-size`), лимиты памяти контейнера. Бот не падает с OOM на 512MB RAM.
-- **Anti-DPI (Россия)**: Встроенный легковесный демон `nfqws` (из пакета Zapret), настроенный на перехват Docker-трафика. Discord работает без VPN.
-- **Безопасность**: Настроены UFW (только SSH), Fail2Ban, автообновления безопасности.
-- **State Preservation**: Автоматический шифрованный бэкап настроек и сессий в приватный GitHub-репозиторий. На новом сервере всё восстанавливается само.
-- **Удобный CLI**: Команда `rpp` для управления с консольным меню.
-
-## 📋 Подготовка (Один раз)
-
-1. **Создайте приватный репозиторий для бэкапов** (например, `rpp-state`) на GitHub. Инициализируйте его пустым `README.md`.
-2. **Получите GitHub PAT (Personal Access Token)**:
-   - Идите в *Settings -> Developer Settings -> Personal access tokens -> Fine-grained tokens*.
-   - Дайте имя, выберите срок действия (например, 1 год).
-   - В *Repository access* выберите **Only select repositories** и укажите ваш `rpp-state`.
-   - В *Permissions -> Repository permissions* дайте **Contents: Read and write**.
-   - Скопируйте токен (начинается с `github_pat_...`).
-3. **Придумайте пароль** для GPG-шифрования архива (любая надежная строка, например, сгенерированная в менеджере паролей).
-
-## 💻 Установка на новый VPS
-
-Зайдите на чистый VPS по SSH (под пользователем `root`) и выполните **одну команду**, подставив свои данные:
-
-```bash
-curl -fsSL [https://raw.githubusercontent.com/ВАШ_ЮЗЕР/rpp-toolkit/main/bootstrap.sh](https://raw.githubusercontent.com/ВАШ_ЮЗЕР/rpp-toolkit/main/bootstrap.sh) | \
-  GH_PAT="github_pat_ВАШ_ТОКЕН" \
-  GH_REPO="ВашЮзер/rpp-state" \
-  GPG_PASS="ВашСуперПароль" \
-  DISCORD_TOKEN="токен_бота_если_это_первый_запуск" \
-  DISCORD_CLIENT_ID="client_id_если_это_первый_запуск" \
-  bash
-
-```
-
-> **Примечание:** `DISCORD_TOKEN` и `DISCORD_CLIENT_ID` обязательны только при **самом первом запуске**, когда бэкапа ещё нет. При переезде на новый VPS их можно не указывать, они восстановятся из бэкапа.
-
-## 🕹 Управление (CLI)
-
-На сервере доступна команда `rpp`.
-Просто введите `rpp` (без аргументов), чтобы открыть удобное меню управления.
-
-**Доступные команды:**
-
-* `rpp start` — запустить бота
-* `rpp stop` — сделать бэкап и остановить бота
-* `rpp restart` — перезапустить
-* `rpp status` — статистика (память, сеть, статус обхода блокировки)
-* `rpp logs` — посмотреть логи бота
-* `rpp backup` — принудительно забэкапить состояние в GitHub
-* `rpp check-dpi` — проверить доступность Discord API через DPI
-
-```
-
----
-
-### 2. `bootstrap.sh`
-
-```bash
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -98,13 +16,13 @@ if [[ "${EUID}" -ne 0 ]]; then
     exit 1
 fi
 
-# Проверка обязательных переменных
-GH_PAT="${GH_PAT:-}"
-GH_REPO="${GH_REPO:-}"
-GPG_PASS="${GPG_PASS:-}"
+# Проверка обязательных переменных (адаптировано под ваши RPP_ переменные)
+GH_PAT="${RPP_GH_TOKEN:-}"
+GH_REPO="${RPP_DATA_REPO:-}"
+GPG_PASS="${RPP_BACKUP_PASSWORD:-}"
 
 if [[ -z "$GH_PAT" || -z "$GH_REPO" || -z "$GPG_PASS" ]]; then
-    echo -e "${RED}❌ Ошибка: Не заданы переменные окружения GH_PAT, GH_REPO или GPG_PASS.${NC}"
+    echo -e "${RED}❌ Ошибка: Не заданы переменные окружения RPP_GH_TOKEN, RPP_DATA_REPO или RPP_BACKUP_PASSWORD.${NC}"
     exit 1
 fi
 
@@ -158,7 +76,7 @@ echo 'APT::Periodic::Unattended-Upgrade "1";' >> /etc/apt/apt.conf.d/20auto-upgr
 # ==========================================
 if ! command -v docker &> /dev/null; then
     echo -e "${GREEN}[2/7] Установка Docker...${NC}"
-    curl -fsSL https://get.docker.com | bash
+    curl -fsSL [https://get.docker.com](https://get.docker.com) | bash
 fi
 
 # ==========================================
@@ -209,7 +127,7 @@ EOF
 # 5. ВОССТАНОВЛЕНИЕ ИЛИ ИНИЦИАЛИЗАЦИЯ
 # ==========================================
 echo -e "${GREEN}[4/7] Работа с состоянием (Backup/Restore)...${NC}"
-export GH_URL="https://oauth2:${GH_PAT}@github.com/${GH_REPO}.git"
+export GH_URL="https://oauth2:${GH_PAT}@[github.com/$](https://github.com/$){GH_REPO}.git"
 
 rm -rf /opt/rpp/.git_backup
 if git clone --depth 1 "$GH_URL" /opt/rpp/.git_backup; then
@@ -222,7 +140,7 @@ if git clone --depth 1 "$GH_URL" /opt/rpp/.git_backup; then
         echo -e "${YELLOW}Бэкап не найден в репозитории. Чистая установка.${NC}"
     fi
 else
-    echo -e "${RED}❌ Не удалось клонировать репозиторий. Проверьте GH_PAT и GH_REPO.${NC}"
+    echo -e "${RED}❌ Не удалось клонировать репозиторий. Проверьте RPP_GH_TOKEN и RPP_DATA_REPO.${NC}"
     exit 1
 fi
 rm -rf /opt/rpp/.git_backup
@@ -233,11 +151,11 @@ chmod 600 /opt/rpp/.env
 echo "GH_PAT=${GH_PAT}" > /opt/rpp/.env
 echo "GH_REPO=${GH_REPO}" >> /opt/rpp/.env
 echo "GPG_PASS=${GPG_PASS}" >> /opt/rpp/.env
-if [[ -n "${DISCORD_TOKEN:-}" ]]; then
-    echo "DISCORD_TOKEN=${DISCORD_TOKEN}" >> /opt/rpp/.env
+if [[ -n "${RPP_DISCORD_TOKEN:-}" ]]; then
+    echo "DISCORD_TOKEN=${RPP_DISCORD_TOKEN}" >> /opt/rpp/.env
 fi
-if [[ -n "${DISCORD_CLIENT_ID:-}" ]]; then
-    echo "DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}" >> /opt/rpp/.env
+if [[ -n "${RPP_DISCORD_CLIENT_ID:-}" ]]; then
+    echo "DISCORD_CLIENT_ID=${RPP_DISCORD_CLIENT_ID}" >> /opt/rpp/.env
 fi
 
 # ==========================================
@@ -246,7 +164,7 @@ fi
 echo -e "${GREEN}[5/7] Настройка обхода блокировки Discord (Zapret NFQWS)...${NC}"
 ZAPRET_DIR="/opt/zapret_core"
 rm -rf "$ZAPRET_DIR"
-git clone --depth 1 https://github.com/bol-van/zapret.git "$ZAPRET_DIR"
+git clone --depth 1 [https://github.com/bol-van/zapret.git](https://github.com/bol-van/zapret.git) "$ZAPRET_DIR"
 ARCH=$(uname -m)
 case "$ARCH" in
     x86_64) BIN_DIR="x86_64" ;;
@@ -303,7 +221,7 @@ cmd_backup() {
 
     echo "Отправка в GitHub..."
     rm -rf .git_backup
-    git clone "https://oauth2:${GH_PAT}@github.com/${GH_REPO}.git" .git_backup
+    git clone "https://oauth2:${GH_PAT}@[github.com/$](https://github.com/$){GH_REPO}.git" .git_backup
     cd .git_backup
     
     # Сиротская ветка перезаписывает всю историю одним коммитом
@@ -364,7 +282,7 @@ cmd_check_dpi() {
         echo "Контейнер не запущен. Сначала выполните rpp start."
         exit 1
     fi
-    HTTP_CODE=$(docker exec -it rpp_bot curl -s -o /dev/null -w "%{http_code}" -m 5 https://discord.com/api/v10/gateway || echo "TIMEOUT")
+    HTTP_CODE=$(docker exec -it rpp_bot curl -s -o /dev/null -w "%{http_code}" -m 5 [https://discord.com/api/v10/gateway](https://discord.com/api/v10/gateway) || echo "TIMEOUT")
     if [[ "$HTTP_CODE" == "401" || "$HTTP_CODE" == "200" || "$HTTP_CODE" == "429" ]]; then
         echo -e "\033[0;32mУСПЕХ!\033[0m Подключение к Discord работает (Код: $HTTP_CODE)."
     else
@@ -424,5 +342,3 @@ echo -e "Трафик Discord заворачивается в Anti-DPI (Zapret).
 echo -e "Для управления введите команду: ${YELLOW}rpp${NC}"
 echo ""
 rpp check-dpi
-
-```
