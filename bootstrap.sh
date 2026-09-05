@@ -21,8 +21,7 @@
 #
 set -euo pipefail
 
-# !!! поменяй на адрес своего форка/репозитория с этим тулкитом !!!
-TOOLKIT_REPO_RAW="${TOOLKIT_REPO_RAW:-https://raw.githubusercontent.com/YOUR_GH_USER/rpp-toolkit/main}"
+TOOLKIT_REPO_RAW="${TOOLKIT_REPO_RAW:-https://raw.githubusercontent.com/faermot/rpp-toolkit/main}"
 INSTALL_DIR="/opt/rpp"
 
 log() { echo -e "\033[1;32m==>\033[0m $*"; }
