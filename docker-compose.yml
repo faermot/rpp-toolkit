@@ -1,0 +1,23 @@
+services:
+  rustplusplus:
+    image: ghcr.io/alexemanuelol/rustplusplus:latest
+    container_name: rpp
+    restart: unless-stopped
+    environment:
+      - RPP_DISCORD_CLIENT_ID=${RPP_DISCORD_CLIENT_ID}
+      - RPP_DISCORD_TOKEN=${RPP_DISCORD_TOKEN}
+      # ограничиваем кучу Node.js, чтобы не упереться в лимит контейнера и не поймать OOM-kill
+      - NODE_OPTIONS=--max-old-space-size=300
+    volumes:
+      - ./data/credentials:/app/credentials
+      - ./data/instances:/app/instances
+      - ./data/logs:/app/logs
+    # жёсткий лимит памяти + разрешаем немного уйти в своп вместо мгновенного OOM-kill
+    mem_limit: 400m
+    memswap_limit: 900m
+    cpus: "1.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
